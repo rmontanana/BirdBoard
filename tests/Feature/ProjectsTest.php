@@ -11,32 +11,24 @@ class ProjectsTest extends TestCase
     use WithFaker, RefreshDatabase;
 
     /** @test */
-    public function a_user_can_create_a_project()
+    public function a_user_can_view_their_projects()
     {
         $this->withoutExceptionHandling();
+        $this->be(factory('App\User')->create());
 
-        $this->actingAs(factory('App\User')->create());
-
-        $attributes = [
-            'title' => $this->faker->sentence,
-            'description' => $this->faker->paragraph
-        ];
-        $this->post('/projects', $attributes)->assertRedirect('/projects');
-        $this->assertDatabaseHas('projects', $attributes);
-        $this->get('/projects')->assertSee($attributes['title']);
+        $project = factory('App\Project')->create(['owner_id' => auth()->id()]);
+        
+        $this->get($project->path())
+            ->assertSee($project->title)
+            ->assertSee($project->description);
     }
 
     /** @test */
-    public function a_user_can_view_a_project()
+    public function an_authenticated_users_cannot_view_the_project_of_others()
     {
-        $this->withoutExceptionHandling();
-        $this->actingAs(factory('App\User')->create());
-
+        $this->be(factory('App\User')->create());
         $project = factory('App\Project')->create();
-        
-        $this->get('/projects/' . $project->id)
-            ->assertSee($project->title)
-            ->assertSee($project->description);
+        $this->get($project->path())->assertStatus(403);
     }
 
     /** @test */
@@ -56,9 +48,22 @@ class ProjectsTest extends TestCase
     }
 
     /** @test */
-    public function only_authenticated_users_can_create_projects()
+    public function guests_cannot_create_projects()
     {
         $attributes = factory('App\Project')->raw();
         $this->post('/projects', [])->assertRedirect('login');
+    }
+
+    /** @test */
+    public function guests_cannot_view_projects()
+    {
+        $this->get('/projects')->assertRedirect('login');
+    }
+
+    /** @test */
+    public function guests_cannot_view_a_single_project()
+    {
+        $project = factory('App\Project')->create();
+        $this->get($project->path())->assertRedirect('login');
     }
 }
